@@ -8,6 +8,7 @@ import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
 import { Modal } from '@/components/common/Modal'
 import { DropdownMenu, DropdownItem } from '@/components/common/DropdownMenu'
+import { PDFPreview } from '@/components/file/PDFPreview'
 import { formatFileSize, formatDate, debounce, cn } from '@/lib/utils'
 import type { Folder, File } from '@/types'
 
@@ -55,6 +56,10 @@ export function Dashboard() {
   // Drag and drop
   const [isDragging, setIsDragging] = useState(false)
   const dragCounter = useRef(0)
+
+  // PDF Preview
+  const [previewFile, setPreviewFile] = useState<File | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
 
   const loadData = async (folderId: number | null = null) => {
     setLoading(true)
@@ -234,6 +239,11 @@ export function Dashboard() {
   const openDeleteModal = (type: 'folder' | 'file', id: number, name: string) => {
     setDeleteTarget({ type, id, name })
     setShowDelete(true)
+  }
+
+  const handleFileClick = (file: File) => {
+    setPreviewFile(file)
+    setShowPreview(true)
   }
 
   // Drag and drop handlers
@@ -497,11 +507,9 @@ export function Dashboard() {
                 key={file.id}
                 className="bg-white rounded-lg p-4 border border-gray-200 hover:border-purple-400 hover:shadow-md transition-all duration-200 group relative"
               >
-                <a
-                  href={filesApi.getPreviewUrl(file.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-start gap-3"
+                <div
+                  onClick={() => handleFileClick(file)}
+                  className="flex items-start gap-3 cursor-pointer"
                 >
                   <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-red-200 transition-colors">
                     <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -514,7 +522,7 @@ export function Dashboard() {
                     <p className="text-xs text-gray-400">by {file.owner_name}</p>
                     <p className="text-xs text-gray-400">{formatDate(file.uploaded_at)}</p>
                   </div>
-                </a>
+                </div>
                 {user && file.owner_id === user.id && (
                   <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu
@@ -653,6 +661,13 @@ export function Dashboard() {
           </div>
         </div>
       </Modal>
+
+      {/* PDF Preview */}
+      <PDFPreview
+        file={previewFile}
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+      />
     </div>
   )
 }
