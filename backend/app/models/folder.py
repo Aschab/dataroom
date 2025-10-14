@@ -27,8 +27,8 @@ class Folder(db.Model):
             'parent_id': self.parent_id,
             'owner_id': self.owner_id,
             'owner_name': self.owner.name if self.owner else None,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'created_at': self.created_at.isoformat() + 'Z' if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() + 'Z' if self.updated_at else None,
         }
         if include_contents:
             result['subfolders'] = [f.to_dict() for f in self.subfolders]

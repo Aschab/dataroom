@@ -28,6 +28,6 @@ class User(db.Model):
             'email': self.email,
             'name': self.name,
             'role': self.role,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None,
+            'created_at': self.created_at.isoformat() + 'Z' if self.created_at else None,
+            'last_login': self.last_login.isoformat() + 'Z' if self.last_login else None,
         }

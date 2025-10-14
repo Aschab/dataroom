@@ -65,8 +65,7 @@ npm run dev
 
 Simple email-based authentication:
 
-- **Register**: Provide email and name
-- **Login**: Only email required (no password)
+- **Register**: Provide email and password
 
 ## Access Control
 

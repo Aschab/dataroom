@@ -34,8 +34,8 @@ class File(db.Model):
             'folder_id': self.folder_id,
             'owner_id': self.owner_id,
             'owner_name': self.owner.name if self.owner else None,
-            'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'uploaded_at': self.uploaded_at.isoformat() + 'Z' if self.uploaded_at else None,
+            'updated_at': self.updated_at.isoformat() + 'Z' if self.updated_at else None,
         }
 
 @event.listens_for(File, 'before_delete')
