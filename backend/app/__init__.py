@@ -15,7 +15,10 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
 
-    CORS(app, origins=[app.config['FRONTEND_URL']], supports_credentials=True)
+    if app.config.get('FLASK_ENV') == 'development':
+        CORS(app, origins='*', supports_credentials=True)
+    else:
+        CORS(app, origins=[app.config['FRONTEND_URL']], supports_credentials=True)
 
     os.makedirs(app.config['FILE_STORAGE_PATH'], exist_ok=True)
 
