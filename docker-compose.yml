@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - backend-storage:/app/storage
+      - backend-db:/app/instance
+    environment:
+      - FLASK_ENV=development
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - JWT_SECRET_KEY=dev-jwt-secret-key
+      - DATABASE_URL=sqlite:///instance/dataroom.db
+      - FRONTEND_URL=http://localhost:5173
+      - FILE_STORAGE_PATH=/app/storage
+      - MAX_FILE_SIZE_MB=100
+    networks:
+      - dataroom-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
+    depends_on:
+      - backend
+    networks:
+      - dataroom-network
+
+volumes:
+  backend-storage:
+  backend-db:
+
+networks:
+  dataroom-network:
+    driver: bridge
