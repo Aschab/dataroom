@@ -1,4 +1,5 @@
 from datetime import datetime
+from sqlalchemy.orm import backref
 from app import db
 
 class Folder(db.Model):
@@ -6,12 +7,12 @@ class Folder(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
-    parent_id = db.Column(db.Integer, db.ForeignKey('folders.id'), nullable=True, index=True)
+    parent_id = db.Column(db.Integer, db.ForeignKey('folders.id', ondelete='CASCADE'), nullable=True, index=True)
     owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    parent = db.relationship('Folder', remote_side=[id], backref='subfolders')
+    parent = db.relationship('Folder', remote_side=[id], backref=backref('subfolders', cascade='all, delete-orphan'))
     owner = db.relationship('User', back_populates='folders')
     files = db.relationship('File', back_populates='folder', cascade='all, delete-orphan')
 

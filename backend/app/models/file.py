@@ -1,4 +1,6 @@
 from datetime import datetime
+import os
+from sqlalchemy import event
 from app import db
 
 class File(db.Model):
@@ -35,3 +37,14 @@ class File(db.Model):
             'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
+
+@event.listens_for(File, 'before_delete')
+def delete_file_from_storage(mapper, connection, target):
+    """Delete physical file from storage when database record is deleted"""
+    from flask import current_app
+    try:
+        full_path = os.path.join(current_app.config['FILE_STORAGE_PATH'], target.storage_path)
+        if os.path.exists(full_path):
+            os.remove(full_path)
+    except Exception as e:
+        current_app.logger.error(f'Failed to delete file {target.storage_path}: {str(e)}')
