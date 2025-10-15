@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from app.models.folder import Folder
 from app.models.file import File
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload
 
 bp = Blueprint('search', __name__, url_prefix='/api/search')
 
@@ -16,11 +17,11 @@ def search():
 
     search_pattern = f'%{query}%'
 
-    folders = Folder.query.filter(
+    folders = Folder.query.options(joinedload(Folder.owner)).filter(
         Folder.name.ilike(search_pattern)
     ).order_by(Folder.name).limit(limit).offset(offset).all()
 
-    files = File.query.filter(
+    files = File.query.options(joinedload(File.owner)).filter(
         or_(
             File.name.ilike(search_pattern),
             File.original_filename.ilike(search_pattern)
