@@ -72,3 +72,15 @@ Simple email-based authentication:
 - **Public**: Anyone can view and download files
 - **Authenticated**: Users can upload, create folders, edit/delete their own content
 - **Admin**: Full CRUD access to all users, files, and folders
+
+### TODOs to scale.
+
+- SQLite was chosen for a speedy development. If this were to expand moving to Postgresql should be trivial.
+- Adding read replicas for the GET commands
+- Connection pooling (PgBouncer) per session to improve latency
+- Storage on s3, we could use something like {user_id}/{year}/{month}/{file_id} as keys
+- Multipart downloads
+- Separate upload/download service
+- If we really want to scale horizontally kubernetes should be implemented
+- Redis caching for search and files metadata
+- Db sharding each XX users. I have used 100k in the past, but this should be calculated on current usage
