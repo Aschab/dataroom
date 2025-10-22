@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app.utils.decorators import require_auth, optional_auth
-from app.services import folder_service
+from app.services import folder_service, file_service
 
 bp = Blueprint('folders', __name__, url_prefix='/api/folders')
 
@@ -16,9 +16,11 @@ def list_folders(user):
 
     owner_id = user.id if owned_only and user else None
     folders = folder_service.get_root_folders(owner_id=owner_id, limit=limit, offset=offset)
+    files = file_service.get_root_files(owner_id=owner_id, limit=limit, offset=offset)
 
     return jsonify({
         'folders': [f.to_dict() for f in folders],
+        'files': [f.to_dict() for f in files],
         'limit': limit,
         'offset': offset
     }), 200

@@ -1,10 +1,10 @@
 import client from './client'
-import type { Folder, FolderContents } from '@/types'
+import type { Folder, FolderContents, File } from '@/types'
 
 export const foldersApi = {
-  list: async (owned: boolean = false): Promise<Folder[]> => {
+  list: async (owned: boolean = false): Promise<{ folders: Folder[]; files: File[] }> => {
     const response = await client.get('/folders', { params: { owned } })
-    return response.data.folders
+    return { folders: response.data.folders, files: response.data.files }
   },
 
   get: async (id: number): Promise<FolderContents> => {

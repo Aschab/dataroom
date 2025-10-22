@@ -45,6 +45,15 @@ def upload_file(file_storage, name, owner_id, folder_id=None):
 def get_file_by_id(file_id):
     return File.query.get(file_id)
 
+def get_root_files(owner_id=None, limit=100, offset=0):
+    from sqlalchemy.orm import joinedload
+    query = File.query.options(joinedload(File.owner)).filter_by(folder_id=None)
+
+    if owner_id:
+        query = query.filter_by(owner_id=owner_id)
+
+    return query.order_by(File.uploaded_at.desc()).limit(limit).offset(offset).all()
+
 def delete_file_by_id(file_id, user_id):
     file_obj = File.query.get(file_id)
 

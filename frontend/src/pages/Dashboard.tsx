@@ -71,10 +71,10 @@ export function Dashboard() {
         setFiles(data.files)
         await buildBreadcrumbs(data.folder)
       } else {
-        const folderData = await foldersApi.list(showOwnedOnly)
+        const data = await foldersApi.list(showOwnedOnly)
         setCurrentFolder(null)
-        setFolders(folderData)
-        setFiles([])
+        setFolders(data.folders)
+        setFiles(data.files)
         setBreadcrumbs([])
       }
       setLoading(false)
