@@ -25,6 +25,11 @@ export const filesApi = {
     await client.delete(`/files/${id}`)
   },
 
+  update: async (id: number, name: string): Promise<File> => {
+    const response = await client.put(`/files/${id}`, { name })
+    return response.data.file
+  },
+
   getDownloadUrl: (id: number): string => {
     return `${client.defaults.baseURL}/files/${id}/download`
   },

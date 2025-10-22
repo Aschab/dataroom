@@ -72,6 +72,29 @@ def preview_file(file_id):
         mimetype=file_obj.mime_type
     )
 
+@bp.route('/<int:file_id>', methods=['PUT'])
+@require_auth
+def update_file(user, file_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    name = data.get('name', '').strip()
+
+    if not name:
+        return jsonify({'error': 'File name is required'}), 400
+
+    try:
+        file_obj = file_service.update_file(file_id, name, user.id)
+        if not file_obj:
+            return jsonify({'error': 'File not found'}), 404
+        return jsonify({'file': file_obj.to_dict()}), 200
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 409
+
 @bp.route('/<int:file_id>', methods=['DELETE'])
 @require_auth
 def delete_file(user, file_id):

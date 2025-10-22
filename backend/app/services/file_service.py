@@ -70,6 +70,29 @@ def delete_file_by_id(file_id, user_id):
 
     return True
 
+def update_file(file_id, name, user_id):
+    file_obj = File.query.get(file_id)
+
+    if not file_obj:
+        return None
+
+    if file_obj.owner_id != user_id:
+        raise PermissionError('You do not have permission to edit this file')
+
+    existing = File.query.filter_by(
+        name=name,
+        owner_id=file_obj.owner_id,
+        folder_id=file_obj.folder_id
+    ).filter(File.id != file_id).first()
+
+    if existing:
+        raise ValueError('A file with this name already exists in this location')
+
+    file_obj.name = name
+    db.session.commit()
+
+    return file_obj
+
 def check_file_ownership(file_id, user_id):
     file_obj = File.query.get(file_id)
     if not file_obj:
