@@ -311,6 +311,24 @@ export function Dashboard() {
   const displayFolders = searchResults?.folders || folders
   const displayFiles = searchResults?.files || files
 
+  // Truncate breadcrumbs to show first + last 3 folders with ellipsis
+  const truncatedBreadcrumbs = useMemo(() => {
+    if (breadcrumbs.length <= 4) {
+      return breadcrumbs
+    }
+    return [
+      breadcrumbs[0],
+      { id: -1, name: '...', parent_id: null, owner_id: -1, owner_name: '', created_at: '', updated_at: '' } as Folder,
+      ...breadcrumbs.slice(-3)
+    ]
+  }, [breadcrumbs])
+
+  // Truncate folder/file name to 20 characters + ellipsis
+  const truncateName = (name: string) => {
+    if (name.length <= 20) return name
+    return name.substring(0, 20) + '...'
+  }
+
   return (
     <div
       className="min-h-screen bg-gray-50"
@@ -381,15 +399,26 @@ export function Dashboard() {
             >
               Home
             </button>
-            {breadcrumbs.map((crumb, index) => (
+            {truncatedBreadcrumbs.map((crumb, index) => (
               <div key={crumb.id} className="flex items-center gap-2 flex-shrink-0">
                 <span className="text-gray-400">/</span>
-                <button
-                  onClick={() => handleBreadcrumbClick(index)}
-                  className="text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                >
-                  {crumb.name}
-                </button>
+                {crumb.id === -1 ? (
+                  <span className="text-gray-400 cursor-default" title="Additional folders in path">
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => {
+                      // Find the actual index in the original breadcrumbs array
+                      const actualIndex = breadcrumbs.findIndex(b => b.id === crumb.id)
+                      handleBreadcrumbClick(actualIndex)
+                    }}
+                    className="text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                    title={crumb.name}
+                  >
+                    {truncateName(crumb.name)}
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -468,7 +497,9 @@ export function Dashboard() {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-gray-900 truncate">{folder.name}</h3>
+                    <h3 className="font-medium text-gray-900 truncate" title={folder.name}>
+                      {truncateName(folder.name)}
+                    </h3>
                     <p className="text-xs text-gray-500 mt-1">by {folder.owner_name}</p>
                     <p className="text-xs text-gray-400 mt-1">{formatDate(folder.created_at)}</p>
                   </div>
@@ -517,7 +548,9 @@ export function Dashboard() {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-gray-900 truncate">{file.name}</h3>
+                    <h3 className="font-medium text-gray-900 truncate" title={file.name}>
+                      {truncateName(file.name)}
+                    </h3>
                     <p className="text-xs text-gray-500 mt-1">{formatFileSize(file.size_bytes)}</p>
                     <p className="text-xs text-gray-400">by {file.owner_name}</p>
                     <p className="text-xs text-gray-400">{formatDate(file.uploaded_at)}</p>
