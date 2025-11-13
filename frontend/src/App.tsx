@@ -63,6 +63,22 @@ function App() {
                 </PrivateRoute>
               }
             />
+            <Route
+              path="/folder/:folderId"
+              element={
+                <PrivateRoute>
+                  <Dashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/search"
+              element={
+                <PrivateRoute>
+                  <Dashboard />
+                </PrivateRoute>
+              }
+            />
           </Routes>
         </ToastProvider>
       </AuthProvider>

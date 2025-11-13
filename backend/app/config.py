@@ -8,7 +8,8 @@ class Config:
 
     FRONTEND_URL = os.environ.get('FRONTEND_URL') or 'http://localhost:5173'
 
-    FILE_STORAGE_PATH = os.environ.get('FILE_STORAGE_PATH') or './storage'
+    _storage_path = os.environ.get('FILE_STORAGE_PATH') or './storage'
+    FILE_STORAGE_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), _storage_path))
     MAX_FILE_SIZE_MB = int(os.environ.get('MAX_FILE_SIZE_MB', 100))
     MAX_CONTENT_LENGTH = MAX_FILE_SIZE_MB * 1024 * 1024
 

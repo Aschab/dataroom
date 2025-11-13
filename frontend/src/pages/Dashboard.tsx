@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/AuthContext'
 import { useToast } from '@/components/common/Toast'
 import { foldersApi } from '@/api/folders'
@@ -15,20 +16,21 @@ import type { Folder, File } from '@/types'
 export function Dashboard() {
   const { user, logout } = useAuth()
   const { showToast } = useToast()
+  const { folderId } = useParams<{ folderId: string }>()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const location = useLocation()
 
-  // Navigation state
-  const [currentFolderId, setCurrentFolderId] = useState<number | null>(null)
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null)
   const [breadcrumbs, setBreadcrumbs] = useState<Folder[]>([])
 
-  // Data state
   const [folders, setFolders] = useState<Folder[]>([])
   const [files, setFiles] = useState<File[]>([])
   const [loading, setLoading] = useState(true)
   const [showOwnedOnly, setShowOwnedOnly] = useState(false)
 
-  // Search state
-  const [searchQuery, setSearchQuery] = useState('')
+  const urlSearchQuery = searchParams.get('q') || ''
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery)
   const [searchResults, setSearchResults] = useState<{ folders: Folder[]; files: File[] } | null>(null)
 
   // Create folder modal
@@ -61,11 +63,15 @@ export function Dashboard() {
   const [previewFile, setPreviewFile] = useState<File | null>(null)
   const [showPreview, setShowPreview] = useState(false)
 
-  const loadData = async (folderId: number | null = null) => {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: { type: 'folder' | 'file'; id: number; name: string; ownerId: number } } | null>(null)
+
+  const currentFolderId = folderId ? parseInt(folderId) : null
+
+  const loadData = async () => {
     setLoading(true)
     try {
-      if (folderId) {
-        const data = await foldersApi.get(folderId)
+      if (currentFolderId) {
+        const data = await foldersApi.get(currentFolderId)
         setCurrentFolder(data.folder)
         setFolders(data.subfolders)
         setFiles(data.files)
@@ -102,8 +108,16 @@ export function Dashboard() {
   }
 
   useEffect(() => {
-    loadData(currentFolderId)
-  }, [currentFolderId, showOwnedOnly])
+    setSearchQuery(urlSearchQuery)
+  }, [urlSearchQuery])
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/search')) {
+      setLoading(false)
+    } else {
+      loadData()
+    }
+  }, [folderId, showOwnedOnly, location.pathname])
 
   const handleSearch = useMemo(
     () =>
@@ -123,23 +137,32 @@ export function Dashboard() {
   )
 
   useEffect(() => {
-    handleSearch(searchQuery)
-  }, [searchQuery, handleSearch])
+    if (urlSearchQuery && urlSearchQuery.length >= 2) {
+      handleSearch(urlSearchQuery)
+    } else {
+      setSearchResults(null)
+    }
+  }, [urlSearchQuery, handleSearch])
+
+  const handleSearchInputChange = (query: string) => {
+    setSearchQuery(query)
+    if (query.length >= 2) {
+      navigate(`/search?q=${encodeURIComponent(query)}`)
+    } else if (query.length === 0) {
+      navigate('/')
+    }
+  }
 
   const handleFolderClick = (folderId: number) => {
-    setCurrentFolderId(folderId)
-    setSearchQuery('')
-    setSearchResults(null)
+    navigate(`/folder/${folderId}`)
   }
 
   const handleBreadcrumbClick = (index: number) => {
     if (index === -1) {
-      setCurrentFolderId(null)
+      navigate('/')
     } else {
-      setCurrentFolderId(breadcrumbs[index].id)
+      navigate(`/folder/${breadcrumbs[index].id}`)
     }
-    setSearchQuery('')
-    setSearchResults(null)
   }
 
   const handleCreateFolder = async () => {
@@ -150,7 +173,7 @@ export function Dashboard() {
       showToast('Folder created successfully', 'success')
       setShowCreateFolder(false)
       setNewFolderName('')
-      loadData(currentFolderId)
+      loadData()
     } catch (error: any) {
       showToast(error.response?.data?.error || 'Failed to create folder', 'error')
     } finally {
@@ -179,7 +202,7 @@ export function Dashboard() {
       setShowUploadFile(false)
       setSelectedFile(null)
       setFileName('')
-      loadData(currentFolderId)
+      loadData()
     } catch (error: any) {
       showToast(error.response?.data?.error || 'Failed to upload file', 'error')
     } finally {
@@ -201,7 +224,7 @@ export function Dashboard() {
       setShowRename(false)
       setRenameTarget(null)
       setRenameName('')
-      loadData(currentFolderId)
+      loadData()
     } catch (error: any) {
       showToast(error.response?.data?.error || 'Failed to rename', 'error')
     } finally {
@@ -222,7 +245,7 @@ export function Dashboard() {
       }
       setShowDelete(false)
       setDeleteTarget(null)
-      loadData(currentFolderId)
+      loadData()
     } catch (error: any) {
       showToast(error.response?.data?.error || 'Failed to delete', 'error')
     } finally {
@@ -245,6 +268,17 @@ export function Dashboard() {
     setPreviewFile(file)
     setShowPreview(true)
   }
+
+  const handleContextMenu = (e: React.MouseEvent, type: 'folder' | 'file', id: number, name: string, ownerId: number) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, item: { type, id, name, ownerId } })
+  }
+
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null)
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [])
 
   // Drag and drop handlers
   const handleDragEnter = (e: React.DragEvent) => {
@@ -304,7 +338,7 @@ export function Dashboard() {
       }
     }
 
-    loadData(currentFolderId)
+    loadData()
   }
 
   const canCreateInCurrentFolder = !currentFolder || currentFolder.owner_id === user?.id
@@ -352,14 +386,14 @@ export function Dashboard() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/')} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
                 <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dataroom</h1>
-            </div>
+            </button>
 
             <div className="flex-1 w-full sm:max-w-md lg:max-w-2xl">
               <div className="relative">
@@ -370,7 +404,7 @@ export function Dashboard() {
                   type="text"
                   placeholder="Search files and folders..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => handleSearchInputChange(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
@@ -429,7 +463,7 @@ export function Dashboard() {
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
               {searchResults ? `Search results for "${searchQuery}"` : currentFolder ? currentFolder.name : 'All Files'}
             </h2>
-            {!searchResults && (
+            {!searchResults && !currentFolder && (
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -481,115 +515,133 @@ export function Dashboard() {
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {displayFolders.map((folder) => (
-              <div
-                key={folder.id}
-                className="bg-white rounded-lg p-4 border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all duration-200 group relative"
-              >
-                <div
-                  className="flex items-start gap-3 cursor-pointer"
-                  onClick={() => handleFolderClick(folder.id)}
-                >
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full divide-y divide-gray-200 table-fixed">
+              <colgroup>
+                <col className="w-[40%] sm:w-[40%]" />
+                <col className="hidden sm:table-column sm:w-[15%]" />
+                <col className="w-[35%] sm:w-[15%]" />
+                <col className="hidden sm:table-column sm:w-[15%]" />
+                <col className="w-[25%] sm:w-[15%]" />
+              </colgroup>
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Owner</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Modified</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">File Size</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <svg className="w-5 h-5 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-gray-900 truncate" title={folder.name}>
-                      {truncateName(folder.name)}
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-1">by {folder.owner_name}</p>
-                    <p className="text-xs text-gray-400 mt-1">{formatDate(folder.created_at)}</p>
-                  </div>
-                </div>
-                {user && folder.owner_id === user.id && (
-                  <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu
-                      trigger={
-                        <button className="p-1 hover:bg-gray-100 rounded transition-colors">
-                          <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {displayFolders.map((folder) => (
+                  <tr
+                    key={`folder-${folder.id}`}
+                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    onContextMenu={(e) => handleContextMenu(e, 'folder', folder.id, folder.name, folder.owner_id)}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap" onClick={() => handleFolderClick(folder.id)}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center flex-shrink-0">
+                          <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                           </svg>
-                        </button>
-                      }
-                    >
-                      <DropdownItem onClick={() => openRenameModal('folder', folder.id, folder.name)}>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Rename
-                      </DropdownItem>
-                      <DropdownItem onClick={() => openDeleteModal('folder', folder.id, folder.name)} danger>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Delete
-                      </DropdownItem>
-                    </DropdownMenu>
-                  </div>
-                )}
-              </div>
-            ))}
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 truncate">{folder.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">{folder.owner_name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(folder.created_at)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">-</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                      {user && folder.owner_id === user.id && (
+                        <DropdownMenu
+                          trigger={
+                            <button className="hover:bg-gray-100 rounded transition-colors">
+                              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                              </svg>
+                            </button>
+                          }
+                        >
+                          <DropdownItem onClick={() => openRenameModal('folder', folder.id, folder.name)}>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Rename
+                          </DropdownItem>
+                          <DropdownItem onClick={() => openDeleteModal('folder', folder.id, folder.name)} danger>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete
+                          </DropdownItem>
+                        </DropdownMenu>
+                      )}
+                    </td>
+                  </tr>
+                ))}
 
-            {displayFiles.map((file) => (
-              <div
-                key={file.id}
-                className="bg-white rounded-lg p-4 border border-gray-200 hover:border-purple-400 hover:shadow-md transition-all duration-200 group relative"
-              >
-                <div
-                  onClick={() => handleFileClick(file)}
-                  className="flex items-start gap-3 cursor-pointer"
-                >
-                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-red-200 transition-colors">
-                    <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-gray-900 truncate" title={file.name}>
-                      {truncateName(file.name)}
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-1">{formatFileSize(file.size_bytes)}</p>
-                    <p className="text-xs text-gray-400">by {file.owner_name}</p>
-                    <p className="text-xs text-gray-400">{formatDate(file.uploaded_at)}</p>
-                  </div>
-                </div>
-                {user && file.owner_id === user.id && (
-                  <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu
-                      trigger={
-                        <button className="p-1 hover:bg-gray-100 rounded transition-colors">
-                          <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                {displayFiles.map((file) => (
+                  <tr
+                    key={`file-${file.id}`}
+                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    onContextMenu={(e) => handleContextMenu(e, 'file', file.id, file.name, file.owner_id)}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap" onClick={() => handleFileClick(file)}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center flex-shrink-0">
+                          <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
-                        </button>
-                      }
-                    >
-                      <DropdownItem onClick={() => openRenameModal('file', file.id, file.name)}>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Rename
-                      </DropdownItem>
-                      <DropdownItem onClick={() => window.open(filesApi.getDownloadUrl(file.id), '_blank')}>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Download
-                      </DropdownItem>
-                      <DropdownItem onClick={() => openDeleteModal('file', file.id, file.name)} danger>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Delete
-                      </DropdownItem>
-                    </DropdownMenu>
-                  </div>
-                )}
-              </div>
-            ))}
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 truncate">{file.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">{file.owner_name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(file.uploaded_at)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">{formatFileSize(file.size_bytes)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                      {user && file.owner_id === user.id && (
+                        <DropdownMenu
+                          trigger={
+                            <button className="hover:bg-gray-100 rounded transition-colors">
+                              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                              </svg>
+                            </button>
+                          }
+                        >
+                          <DropdownItem onClick={() => openRenameModal('file', file.id, file.name)}>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Rename
+                          </DropdownItem>
+                          <DropdownItem onClick={() => window.open(filesApi.getDownloadUrl(file.id), '_blank')}>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download
+                          </DropdownItem>
+                          <DropdownItem onClick={() => openDeleteModal('file', file.id, file.name)} danger>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete
+                          </DropdownItem>
+                        </DropdownMenu>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -707,6 +759,70 @@ export function Dashboard() {
         isOpen={showPreview}
         onClose={() => setShowPreview(false)}
       />
+
+      {contextMenu && (
+        <div
+          className="fixed bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 min-w-[160px]"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          {user && contextMenu.item.ownerId === user.id && (
+            <>
+              <button
+                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                onClick={() => {
+                  openRenameModal(contextMenu.item.type, contextMenu.item.id, contextMenu.item.name)
+                  setContextMenu(null)
+                }}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Rename
+              </button>
+              {contextMenu.item.type === 'file' && (
+                <button
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                  onClick={() => {
+                    window.open(filesApi.getDownloadUrl(contextMenu.item.id), '_blank')
+                    setContextMenu(null)
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download
+                </button>
+              )}
+              <button
+                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+                onClick={() => {
+                  openDeleteModal(contextMenu.item.type, contextMenu.item.id, contextMenu.item.name)
+                  setContextMenu(null)
+                }}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete
+              </button>
+            </>
+          )}
+          {(!user || contextMenu.item.ownerId !== user.id) && contextMenu.item.type === 'file' && (
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+              onClick={() => {
+                window.open(filesApi.getDownloadUrl(contextMenu.item.id), '_blank')
+                setContextMenu(null)
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -5,14 +5,10 @@ from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
 def create_folder(name, owner_id, parent_id=None):
-    existing = Folder.query.filter_by(
-        name=name,
-        owner_id=owner_id,
-        parent_id=parent_id
-    ).first()
+    existing = Folder.query.filter_by(name=name).first()
 
     if existing:
-        raise ValueError('A folder with this name already exists in this location')
+        raise ValueError('A folder with this name already exists')
 
     folder = Folder(name=name, owner_id=owner_id, parent_id=parent_id)
     db.session.add(folder)
@@ -54,14 +50,10 @@ def update_folder(folder_id, name, user_id):
     if folder.owner_id != user_id:
         raise PermissionError('You do not have permission to edit this folder')
 
-    existing = Folder.query.filter_by(
-        name=name,
-        owner_id=folder.owner_id,
-        parent_id=folder.parent_id
-    ).filter(Folder.id != folder_id).first()
+    existing = Folder.query.filter_by(name=name).filter(Folder.id != folder_id).first()
 
     if existing:
-        raise ValueError('A folder with this name already exists in this location')
+        raise ValueError('A folder with this name already exists')
 
     folder.name = name
     db.session.commit()

@@ -11,14 +11,10 @@ def upload_file(file_storage, name, owner_id, folder_id=None):
         if folder.owner_id != owner_id:
             raise PermissionError('You can only upload files to your own folders')
 
-    existing = File.query.filter_by(
-        name=name,
-        owner_id=owner_id,
-        folder_id=folder_id
-    ).first()
+    existing = File.query.filter_by(name=name).first()
 
     if existing:
-        raise ValueError('A file with this name already exists in this location')
+        raise ValueError('A file with this name already exists')
 
     storage_path, original_filename = save_file(file_storage)
 
@@ -79,14 +75,10 @@ def update_file(file_id, name, user_id):
     if file_obj.owner_id != user_id:
         raise PermissionError('You do not have permission to edit this file')
 
-    existing = File.query.filter_by(
-        name=name,
-        owner_id=file_obj.owner_id,
-        folder_id=file_obj.folder_id
-    ).filter(File.id != file_id).first()
+    existing = File.query.filter_by(name=name).filter(File.id != file_id).first()
 
     if existing:
-        raise ValueError('A file with this name already exists in this location')
+        raise ValueError('A file with this name already exists')
 
     file_obj.name = name
     db.session.commit()
